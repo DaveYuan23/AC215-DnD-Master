@@ -19,13 +19,14 @@ The goal is to automatically retrain and redeploy the narrator model whenever ne
 # Project Structure
 '''
 src/ml-workflow/
-├── configs/
-├── data-collector/
-├── data-processor/
-├── model-training/
-├── workflow/
-└── persistent/
-└── README.Rmd
+├── configs/                 # Centralized YAML configurations
+│   ├── processor_config.yaml
+│   └── training_config.yaml
+├── data-collector/          # Container for raw data ingestion
+├── data-processor/          # Container for cleaning & splitting (JSONL generation)
+├── model-training/          # Container for Vertex AI SDK interaction
+├── workflow/                # Orchestrator (CLI & Docker-in-Docker logic)
+├── persistent/              # Local mount for logs and temp files
 '''
 
 # Pipeline Architecture
@@ -68,6 +69,14 @@ project_id = "542859696336"
 location   = "us-central1"
 '''
 
+# Workflow (Running the Pipeline)
+You can run the entire workflow with a single command using the orchestrator script:
+
+'''
+# Run full pipeline (Processor -> Trainer) with 3 epochs
+cd workflow
+./docker-shell.sh run-all --epochs 3
+'''
 
 # Model Design Choices
 1. Base Model
@@ -81,3 +90,12 @@ Fast fine-tuning iterations
 Significantly lower cost
 
 Proven stability for instruction→response tasks
+
+2. Key MLOps Features
+Config-Driven Development: All hyperparameters (epochs, batch size) and data paths are decoupled from code, managed via YAML files in configs/.
+
+Containerization: Every step (Collector, Processor, Trainer) runs in isolated Docker containers to ensure environment consistency.
+
+Data Versioning: Processed datasets are stored in versioned GCS paths (e.g., processor_v1.0.0/) to prevent data drift issues.
+
+Experiment Tracking: Every training run generates a unique timestamped log folder in persistent/training_runs/ containing a snapshot of the configuration and the job request payload.

@@ -1,0 +1,13 @@
+raw_data:
+  version: "2025-11-22"
+  description: "Initial raw snapshot for DND dialogues"
+
+processed_data:
+  processor_version: "processor_v1.0.0"
+  schema_version: "schema_v1.0.0"
+  dataset_version: "dataset_v1.0.0"
+  gcs_prefix: "gs://ac215-ml-workflow/dnd-ml-dataset-processor/"
+
+notes:
+  - "First dataset used for Gemini fine-tuning."
+  - "subset_size=100, train_split=0.9"

@@ -5,7 +5,7 @@ set -e
 export GCP_PROJECT="even-turbine-471117-u0"
 export GCS_PACKAGE_URI="gs://even-turbine-471117-u0/model-training"
 export PACKAGE_NAME="dnd-model-trainer"
-export PACKAGE_DIR="trainer"     # 你的 Python 包目录
+export PACKAGE_DIR="trainer"    
 export OUTPUT_TAR="${PACKAGE_NAME}.tar.gz"
 
 echo "============================================"

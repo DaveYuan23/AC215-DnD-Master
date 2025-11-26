@@ -2,29 +2,54 @@
 set -e
 
 echo "============================================"
-echo "🚀 DnD Model-Training Container Started"
+echo "🚀 AC215 Model Training Container Started"
 echo "============================================"
 echo "Architecture: $(uname -m)"
 echo "Python version: $(python --version)"
-echo "UV version: $(uv --version)"
-echo "GCP_PROJECT=${GCP_PROJECT}"
-echo "GCS_BUCKET_NAME=${GCS_BUCKET_NAME}"
+
+if command -v uv &> /dev/null; then
+    echo "UV version: $(uv --version)"
+fi
 echo "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}"
 echo "--------------------------------------------"
 
+# ------------------------------------------------------------
 # Activate virtual environment
-echo "🔧 Activating virtual environment..."
-if [ -d "/.venv" ]; then
-  source /.venv/bin/activate
+# ------------------------------------------------------------
+if [ -f "/.venv/bin/activate" ]; then
+    echo "🔧 Activating virtual environment..."
+    source /.venv/bin/activate
+fi
+export PYTHONPATH="/app:$PYTHONPATH"
+# ------------------------------------------------------------
+# Sanity check: configs folder must be mounted
+# ------------------------------------------------------------
+if [ ! -d "/app/configs" ]; then
+    echo "❌ ERROR: /app/configs not found."
+    echo "You must mount configs:"
+    echo "    -v <host>/configs:/app/configs"
+    exit 1
 fi
 
-# Default to "tune"
-if [ $# -eq 0 ]; then
-  echo "💡 No arguments provided → default: tune"
-  set -- tune
+if [ ! -f "/app/configs/training_config.yaml" ]; then
+    echo "❌ ERROR: training_config.yaml missing in /app/configs."
+    exit 1
 fi
 
-echo "▶️ Running CLI with args: $@"
+# ------------------------------------------------------------
+# If no args → drop into shell (safe default)
+# ------------------------------------------------------------
+if [[ $# -eq 0 ]]; then
+    echo "💡 No command provided."
+    echo "👉 Entering interactive shell."
+    echo "You may run:"
+    echo "    python trainer/task.py tune --epochs 3"
+    echo "--------------------------------------------"
+    exec /bin/bash
+fi
 
-# Always run CLI. Never re-interpret arguments.
-exec uv run python /app/cli.py "$@"
+# ------------------------------------------------------------
+# Run the provided arguments
+# ------------------------------------------------------------
+echo "▶️ Executing command: $@"
+exec "$@"

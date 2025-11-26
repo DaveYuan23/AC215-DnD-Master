@@ -7,14 +7,15 @@ FROM python:3.12-slim-bookworm
 # ------------------------------------------------------------
 # Basic environment setup
 # ------------------------------------------------------------
-
 ARG DEBIAN_PACKAGES="build-essential git curl wget unzip gzip"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 ENV PYTHONUNBUFFERED=1
 
-# uv settings
+ENV PATH="/.venv/bin:$PATH"
+
+# uv environment
 ENV UV_LINK_MODE=copy
 ENV UV_PROJECT_ENVIRONMENT=/.venv
 
@@ -33,25 +34,31 @@ RUN set -ex; \
     mkdir -p /persistent && chown app:app /persistent && \
     mkdir -p /.venv && chown app:app /.venv
 
-# Switch user and set working directory
+# ------------------------------------------------------------
+# Switch user
+# ------------------------------------------------------------
 USER app
 WORKDIR /app
 
 # ------------------------------------------------------------
-# Install Python dependencies with uv
+# Install Python dependencies
 # ------------------------------------------------------------
-
-# Only copy dependency declarations first for clean layer caching
 COPY --chown=app:app pyproject.toml uv.lock* ./
-
 RUN uv sync --frozen
 
 # ------------------------------------------------------------
-# Copy the rest of the project
+# Copy trainer package code
 # ------------------------------------------------------------
 COPY --chown=app:app . ./
 
 # ------------------------------------------------------------
-# Entry point → handled by docker-entrypoint.sh
+# IMPORTANT: Config files are NOT baked into the image
+# Config folder will be mounted at runtime:
+#   -v "$BASE_DIR/../configs":/app/configs
+# This respects the MLOps rule: "Immutable code, mutable config"
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Use docker-entrypoint.sh to handle CLI logic
 # ------------------------------------------------------------
 ENTRYPOINT ["/bin/bash", "docker-entrypoint.sh"]

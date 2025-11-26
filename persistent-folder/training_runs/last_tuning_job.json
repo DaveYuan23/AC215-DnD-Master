@@ -1,0 +1,8 @@
+{
+  "project_id": "even-turbine-471117-u0",
+  "location": "us-central1",
+  "job_name": "projects/542859696336/locations/us-central1/tuningJobs/2488529666487353344",
+  "base_model": "gemini-2.5-flash",
+  "status": "JobState.JOB_STATE_PENDING",
+  "start_time": 1764142559.7488537
+}

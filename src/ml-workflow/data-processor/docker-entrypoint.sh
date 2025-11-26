@@ -6,22 +6,35 @@ echo "🚀 DnD Data Processor Container Started"
 echo "============================================"
 echo "Architecture: $(uname -m)"
 echo "Python version: $(python --version)"
-echo "UV version: $(uv --version)"
+
+if command -v uv &> /dev/null; then
+    echo "UV version: $(uv --version)"
+else
+    echo "UV version: Not found (using pip environment)"
+fi
+
 echo "GCP_PROJECT=${GCP_PROJECT}"
 echo "GCS_BUCKET_NAME=${GCS_BUCKET_NAME}"
 echo "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}"
 echo "--------------------------------------------"
 
-echo "🔧 Activating virtual environment..."
-source /.venv/bin/activate
-
-# Default behavior → run processor.py
-if [[ $# -eq 0 ]]; then
-    echo "💡 No arguments provided → running default: processor.py"
-    uv run python processor.py
-    exit 0
+echo "🔧 Activating virtual environment (if exists)..."
+if [ -f "/.venv/bin/activate" ]; then
+    source /.venv/bin/activate || true
 fi
 
-# Allow users to override command (advanced use)
-echo "▶️ Running custom command: uv run python $@"
-uv run python "$@"
+# ============================================================
+# Logic Branching 
+# ============================================================
+
+# Case 1 — No arguments → default to processor.py
+if [[ $# -eq 0 ]]; then
+    echo "💡 No arguments provided → running default: processor.py"
+    
+    # Use exec so python becomes PID 1 (correct container behavior)
+    exec python processor.py
+fi
+
+# Case 2 — Custom command
+echo "▶️ Executing custom command: $@"
+exec "$@"
