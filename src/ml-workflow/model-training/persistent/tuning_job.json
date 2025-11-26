@@ -1,0 +1,9 @@
+{
+  "project_id": "542859696336",
+  "job_name": "projects/542859696336/locations/us-central1/tuningJobs/4916557554605096960",
+  "base_model": "gemini-2.5-flash",
+  "status": "JobState.JOB_STATE_RUNNING",
+  "start_time": 1764029234.0795364,
+  "tuned_model_endpoint": null,
+  "tuned_model_name": "projects/542859696336/locations/us-central1/models/5275622816325042176@1"
+}
