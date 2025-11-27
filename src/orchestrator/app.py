@@ -171,7 +171,7 @@ def call_narrator_agent(user_input: str, rules_context: Optional[str] = None, ge
             return {
                 "agent": "narrator",
                 "result": f"You attempt: {user_input}. The story continues, but the narrator is temporarily unavailable.",
-                "choices": None
+                "choices": []
             }
         
         logger.info(f"Calling narrator agent with input: {user_input}")
@@ -207,7 +207,7 @@ def call_narrator_agent(user_input: str, rules_context: Optional[str] = None, ge
 
     except Exception as e:
         logger.error(f"Error calling narrator agent: {str(e)}")
-        return {"agent": "narrator", "result": f"Narrator error: {str(e)}", "choices": None}
+        return {"agent": "narrator", "result": f"Narrator error: {str(e)}", "choices": []}
 
 
 def extract_choices_from_text(text: str) -> Optional[List[str]]:

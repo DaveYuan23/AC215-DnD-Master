@@ -12,14 +12,14 @@ retrieve_dnd_rules_func = types.FunctionDeclaration(
         "Search through the embedded rulebook database for mechanics, conditions, or combat rules."
     ),
     parameters={
-        "type": "object",
+        "type": "OBJECT",
         "properties": {
             "query": {
-                "type": "string",
+                "type": "STRING",
                 "description": "User action or intent (e.g. 'attack the goblin', 'move 30 feet', 'cast fireball')."
             },
             "n_results": {
-                "type": "integer",
+                "type": "INTEGER",
                 "description": "Number of relevant rule chunks to retrieve.",
                 "default": 5
             },

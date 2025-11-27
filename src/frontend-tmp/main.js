@@ -139,14 +139,24 @@ class CombatApp {
     }
 
     checkTurn() {
-        if (!this.currentState) return;
+        if (!this.currentState) {
+            console.log('[DEBUG] checkTurn: No current state');
+            return;
+        }
 
         const currentActor = this.currentState.current_actor;
-        if (!currentActor) return;
+        console.log('[DEBUG] checkTurn: Current actor =', currentActor);
+
+        if (!currentActor) {
+            console.log('[DEBUG] checkTurn: No current actor set');
+            return;
+        }
 
         // Find the actor in players or enemies
         const isPlayer = this.currentState.players.some(p => p.name === currentActor && p.alive);
         const isEnemy = this.currentState.enemies.some(e => e.name === currentActor && e.alive);
+
+        console.log('[DEBUG] checkTurn: isPlayer =', isPlayer, ', isEnemy =', isEnemy);
 
         if (isPlayer) {
             this.isPlayerTurn = true;
@@ -154,6 +164,7 @@ class CombatApp {
             this.currentTurnDisplay.style.color = '#2d5016';
             this.actionInput.disabled = false;
             this.actionInput.focus();
+            console.log('[DEBUG] Player turn activated');
         } else if (isEnemy) {
             this.isPlayerTurn = false;
             this.currentTurnDisplay.textContent = `${currentActor}'s Turn - Enemy is deciding...`;
@@ -161,6 +172,7 @@ class CombatApp {
             this.actionInput.disabled = true;
             this.submitBtn.disabled = true;
 
+            console.log('[DEBUG] Enemy turn detected, triggering in 1.5s');
             // Automatically trigger enemy turn
             setTimeout(() => this.triggerEnemyTurn(), 1500);
         }
@@ -168,7 +180,9 @@ class CombatApp {
 
     async triggerEnemyTurn() {
         try {
+            console.log('[DEBUG] Triggering enemy turn for session:', this.sessionId);
             const response = await DataService.SendAction(this.sessionId, 'enemy_turn');
+            console.log('[DEBUG] Enemy turn response:', response);
 
             // Update state
             this.currentState = response.state;
@@ -189,7 +203,12 @@ class CombatApp {
             this.checkTurn();
 
         } catch (error) {
-            console.error('Error in enemy turn:', error);
+            console.error('[ERROR] Error in enemy turn:', error);
+            console.error('[ERROR] Error details:', error.response?.data);
+            // Show error to user
+            alert(`Enemy turn failed: ${error.response?.data?.detail || error.message}`);
+            // Re-enable input as fallback
+            this.actionInput.disabled = false;
         }
     }
 

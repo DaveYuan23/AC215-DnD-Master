@@ -14,13 +14,13 @@ from google.genai.types import Content, Part, GenerationConfig, ToolConfig
 from google.genai import errors
 
 # Langchain
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import CharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from semantic_splitter import SemanticChunker
 import agent_tools
 
 # Setup
-GCP_PROJECT = os.environ["GCP_PROJECT"]
+GCP_PROJECT = os.environ.get("GCP_PROJECT", "default-project")
 GCP_LOCATION = "us-central1"
 EMBEDDING_MODEL = "text-embedding-004"
 EMBEDDING_DIMENSION = 256

@@ -1,0 +1,157 @@
+# Docker Compose configuration for CI/CD testing
+# This file is used by GitHub Actions to run automated tests
+# Key differences from docker-compose.yml:
+# - Uses mock/test credentials instead of real secrets
+# - Temporary data volumes (cleaned up after tests)
+# - Only includes services needed for testing
+# - Test-specific service names to avoid conflicts
+
+services:
+  # Test runner container - runs pytest
+  test-runner:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile
+    image: dnd/test-runner:ci
+    container_name: dnd-test-runner
+    environment:
+      PYTHONPATH: /app/src/backend-tmp:/app/src/rule_agent:/app/src/orchestrator
+      # Test environment flags
+      TESTING: "true"
+      CI: "true"
+    volumes:
+      # Mount test results and coverage reports
+      - ./htmlcov:/app/htmlcov
+      - ./coverage.xml:/app/coverage.xml
+      # Mount tests and source code
+      - ./tests:/app/tests
+      - ./src:/app/src
+      - ./conftest.py:/app/conftest.py
+      - ./pytest.ini:/app/pytest.ini
+    depends_on:
+      - chromadb-test
+      - rule-agent-test
+      - combat-agent-test
+    # Use host network mode to access services via localhost
+    network_mode: host
+    # Override default command - will be specified by CI
+    command: ["pytest", "/app/tests", "-v", "--tb=short"]
+
+  # ChromaDB for testing - uses temporary storage
+  chromadb-test:
+    image: chromadb/chroma:latest
+    container_name: dnd-chromadb-test
+    environment:
+      # Use in-memory/temporary storage for tests
+      - IS_PERSISTENT=FALSE
+      - ANONYMIZED_TELEMETRY=FALSE
+      - CHROMA_CORS_ALLOW_ORIGINS=["*"]
+    # No persistent volumes - data is ephemeral
+    tmpfs:
+      - /chroma/chroma
+    ports:
+      - "8000:8000"  # Expose for system tests
+    networks:
+      - test-network
+    # No healthcheck - ChromaDB image doesn't have curl/wget/python
+    # Services will wait and retry connections instead
+
+  # Rule Agent for testing
+  rule-agent-test:
+    build:
+      context: ./src/rule_agent
+      dockerfile: Dockerfile
+    image: dnd/rule-agent:test
+    container_name: dnd-rule-agent-test
+    environment:
+      # Test environment variables
+      GCP_PROJECT: test-project
+      GCP_LOCATION: us-central1
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/llm-service-account.json
+      CHROMADB_HOST: chromadb-test
+      CHROMADB_PORT: 8000
+      TESTING: "true"
+    volumes:
+      # Use mock secrets for testing
+      - ./secrets:/secrets:ro
+    ports:
+      - "9002:9002"  # Expose for system tests
+    depends_on:
+      - chromadb-test
+    command: ["/bin/bash", "-c", "sleep 10 && uv run uvicorn app:app --host 0.0.0.0 --port 9002"]
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9002/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Combat Agent for testing
+  combat-agent-test:
+    build:
+      context: ./src/backend-tmp
+      dockerfile: Dockerfile
+    image: dnd/combat-agent:test
+    container_name: dnd-combat-agent-test
+    environment:
+      # Test environment variables
+      GCP_PROJECT: test-project
+      GCP_LOCATION: us-central1
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/llm-service-account.json
+      DEV: "1"  # Enable dev/test mode
+      TESTING: "true"
+    volumes:
+      # Use mock secrets for testing
+      - ./secrets:/secrets:ro
+    ports:
+      - "9000:9000"  # Expose for system tests
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Orchestrator/API Gateway for testing (optional - only if needed for system tests)
+  api-gateway-test:
+    build:
+      context: ./src/orchestrator
+      dockerfile: Dockerfile
+    image: dnd/api-gateway:test
+    container_name: dnd-api-gateway-test
+    environment:
+      # Mock API keys for testing
+      OPENAI_API_KEY: test-key-mock
+      GCP_PROJECT: test-project
+      GCP_LOCATION: us-central1
+      NARRATOR_ENDPOINT_ID: "test-endpoint-id"
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/llm-service-account.json
+      # Service URLs pointing to test containers
+      RULE_AGENT_URL: http://rule-agent-test:9002
+      COMBAT_AGENT_URL: http://combat-agent-test:9000
+      NARRATOR_AGENT_URL: http://narrator-agent-test:9001
+      TESTING: "true"
+    volumes:
+      # Use mock secrets for testing
+      - ./secrets:/secrets:ro
+    expose:
+      - "8000"
+    depends_on:
+      rule-agent-test:
+        condition: service_healthy
+      combat-agent-test:
+        condition: service_healthy
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+networks:
+  test-network:
+    name: dnd-test-network
+    driver: bridge

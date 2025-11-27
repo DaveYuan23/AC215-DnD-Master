@@ -1,0 +1,172 @@
+name: CI - DnD Master Full Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  unit-and-integration-tests:
+    name: Unit & Integration Tests (Containerized)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build test container
+      run: |
+        docker build -f tests/Dockerfile -t dnd/test-runner:ci .
+
+    - name: Run unit tests in container
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}/htmlcov:/app/htmlcov \
+          -v ${{ github.workspace }}/coverage.xml:/app/coverage.xml \
+          dnd/test-runner:ci \
+          pytest /app/tests/unit -v -m unit --tb=short
+
+    - name: Run integration tests in container
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}/htmlcov:/app/htmlcov \
+          -v ${{ github.workspace }}/coverage.xml:/app/coverage.xml \
+          dnd/test-runner:ci \
+          pytest /app/tests/integration -v -m integration --tb=short
+
+    - name: Generate coverage report in container
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}/htmlcov:/app/htmlcov \
+          -v ${{ github.workspace }}/coverage.xml:/app/coverage.xml \
+          dnd/test-runner:ci \
+          pytest /app/tests/unit /app/tests/integration \
+            --cov=/app/src/backend-tmp/api \
+            --cov=/app/src/rule_agent \
+            --cov=/app/src/orchestrator \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term \
+            -m "unit or integration"
+      continue-on-error: true
+
+    - name: Upload coverage to artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: |
+          coverage.xml
+          htmlcov/
+      if: always()
+
+  system-tests:
+    name: System Tests (Docker Compose)
+    runs-on: ubuntu-latest
+    needs: unit-and-integration-tests
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Create mock secrets directory
+      run: |
+        mkdir -p secrets
+        echo '{"type": "service_account"}' > secrets/llm-service-account.json
+
+    - name: Build test services
+      run: |
+        docker-compose -f docker-compose.test.yml build
+
+    - name: Start backend services for system tests
+      run: |
+        # Start services in detached mode
+        docker-compose -f docker-compose.test.yml up -d combat-agent-test rule-agent-test chromadb-test
+
+        # Wait for services to be healthy
+        echo "Waiting for services to be healthy..."
+        sleep 10
+
+    - name: Check service health
+      run: |
+        # Wait for ChromaDB
+        echo "Checking ChromaDB health..."
+        docker-compose -f docker-compose.test.yml exec -T chromadb-test curl -f http://localhost:8000/api/v1/heartbeat || echo "ChromaDB check failed (may be ok if not fully ready)"
+
+        # Wait for Combat Agent
+        echo "Checking Combat Agent health..."
+        for i in {1..30}; do
+          if curl -f http://localhost:9000/health 2>/dev/null; then
+            echo "✓ Combat Agent is healthy"
+            break
+          fi
+          echo "Waiting for Combat Agent... ($i/30)"
+          sleep 2
+        done
+
+        # Wait for Rule Agent
+        echo "Checking Rule Agent health..."
+        for i in {1..30}; do
+          if curl -f http://localhost:9002/health 2>/dev/null; then
+            echo "✓ Rule Agent is healthy"
+            break
+          fi
+          echo "Waiting for Rule Agent... ($i/30)"
+          sleep 2
+        done
+
+    - name: Run system tests in test container
+      run: |
+        docker-compose -f docker-compose.test.yml run --rm test-runner \
+          pytest tests/system -v -m system --tb=short
+      continue-on-error: true
+
+    - name: Show service logs on failure
+      if: failure()
+      run: |
+        echo "=== Combat Agent Logs ==="
+        docker-compose -f docker-compose.test.yml logs combat-agent-test
+        echo ""
+        echo "=== Rule Agent Logs ==="
+        docker-compose -f docker-compose.test.yml logs rule-agent-test
+        echo ""
+        echo "=== ChromaDB Logs ==="
+        docker-compose -f docker-compose.test.yml logs chromadb-test
+
+    - name: Stop all test services
+      if: always()
+      run: |
+        docker-compose -f docker-compose.test.yml down -v
+
+  lint-and-format:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install black flake8 isort
+
+    - name: Check code formatting with Black
+      run: |
+        black --check src/backend-tmp/api tests
+      continue-on-error: true
+
+    - name: Check imports with isort
+      run: |
+        isort --check-only src/backend-tmp/api tests
+      continue-on-error: true
+
+    - name: Lint with flake8
+      run: |
+        flake8 src/backend-tmp/api tests --max-line-length=100 --ignore=E203,W503
+      continue-on-error: true

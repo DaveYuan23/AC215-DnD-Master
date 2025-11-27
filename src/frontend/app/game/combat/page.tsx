@@ -175,16 +175,23 @@ export default function CombatPage() {
   }
 
   const checkTurn = (state: CombatState) => {
-    if (!state || !state.current_actor) return
+    if (!state || !state.current_actor) {
+      console.log('[DEBUG checkTurn] No state or current_actor')
+      return
+    }
 
     const currentActor = state.current_actor
     const isPlayer = state.players.some(p => p.name === currentActor && p.alive)
     const isEnemy = state.enemies.some(e => e.name === currentActor && e.alive)
 
+    console.log('[DEBUG checkTurn]', { currentActor, isPlayer, isEnemy })
+
     if (isPlayer) {
       setIsPlayerTurn(true)
+      console.log('[DEBUG checkTurn] Player turn set')
     } else if (isEnemy) {
       setIsPlayerTurn(false)
+      console.log('[DEBUG checkTurn] Enemy turn detected, scheduling triggerEnemyTurn in 1.5s')
       // Automatically trigger enemy turn
       setTimeout(() => triggerEnemyTurn(), 1500)
     }

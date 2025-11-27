@@ -232,9 +232,10 @@ Example: "I attack {target.name} with my weapon"
                 print(f"Error setting up AI decision (using fallback): {e}")
         
         # Fallback to simple attack (always works, never hangs)
+        from api.utils.combat_engine import ACTION_REGISTRY
         return {
             "id": 0,
-            "type": "MeleeAttack",
+            "type": ACTION_REGISTRY[0],
             "target": target
         }
 

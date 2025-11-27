@@ -1,5 +1,7 @@
 import os
 import uuid
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict
@@ -9,12 +11,44 @@ from api.utils.combat_ai import ActionParser, ActionParserBot, DnDBot, DnDNarrat
 # Define Router
 router = APIRouter()
 
+# Thread pool for running synchronous narrator calls with timeout
+narrator_executor = ThreadPoolExecutor(max_workers=4)
+
 # In-memory session storage (in production, use Redis or database)
 combat_sessions: Dict[str, CombatEngine] = {}
 action_parsers: Dict[str, ActionParser] = {}
 bot_parsers: Dict[str, ActionParserBot] = {}
 bots: Dict[str, DnDBot] = {}
 narrators: Dict[str, DnDNarrator] = {}
+
+
+async def narrate_with_timeout(narrator: DnDNarrator, user_query: str, action_result: str, timeout: float = 5.0) -> str:
+    """
+    Call narrator.narrate() with a timeout.
+
+    Args:
+        narrator: The DnDNarrator instance
+        user_query: Player's action description
+        action_result: Mechanical outcome
+        timeout: Timeout in seconds (default 5.0)
+
+    Returns:
+        Narrative text or fallback to action_result on timeout/error
+    """
+    loop = asyncio.get_event_loop()
+    try:
+        # Run synchronous narrator.narrate() in thread pool with timeout
+        narrative = await asyncio.wait_for(
+            loop.run_in_executor(narrator_executor, narrator.narrate, user_query, action_result),
+            timeout=timeout
+        )
+        return narrative
+    except asyncio.TimeoutError:
+        print(f"[WARNING] Narrator timeout after {timeout}s, using raw result as fallback")
+        return action_result
+    except Exception as e:
+        print(f"[WARNING] Narrator exception: {e}, using raw result as fallback")
+        return action_result
 
 
 # ========== Pydantic Models ==========
@@ -150,7 +184,15 @@ async def start_combat(request: InitiateCombatRequest) -> Dict:
     action_parsers[session_id] = ActionParser(engine)
     bot_parsers[session_id] = ActionParserBot(engine)
     bots[session_id] = DnDBot(engine)
-    narrators[session_id] = DnDNarrator()
+
+    # Initialize narrator (with error handling)
+    try:
+        print("[DEBUG] Initializing DnDNarrator...")
+        narrators[session_id] = DnDNarrator()
+        print("[DEBUG] DnDNarrator initialized successfully")
+    except Exception as e:
+        print(f"[WARNING] Failed to initialize narrator: {e}, will use raw combat results")
+        narrators[session_id] = None
 
     # Set the first actor for the initial turn
     engine.next_turn()
@@ -232,8 +274,14 @@ async def player_action(session_id: str, request: PlayerActionRequest) -> Action
         # Execute action
         raw_result = engine.process_action(action)
 
-        # Generate narrative
-        narrative = narrator.narrate(request.action, raw_result)
+        # Generate narrative with 5-second timeout
+        if narrator:
+            print(f"[DEBUG] Generating narrative for player action...")
+            narrative = await narrate_with_timeout(narrator, request.action, raw_result, timeout=5.0)
+            print(f"[DEBUG] Narrative completed: {narrative[:50]}...")
+        else:
+            print(f"[DEBUG] Narrator not available, using raw result")
+            narrative = raw_result
 
     else:
         # It's an enemy turn - process enemy action (ignore player-provided action text)
@@ -245,8 +293,14 @@ async def player_action(session_id: str, request: PlayerActionRequest) -> Action
         # Execute action
         raw_result = engine.process_action(action)
 
-        # Generate narrative
-        narrative = narrator.narrate(raw_result, raw_result)
+        # Generate narrative with 5-second timeout
+        if narrator:
+            print(f"[DEBUG] Generating narrative for enemy action...")
+            narrative = await narrate_with_timeout(narrator, raw_result, raw_result, timeout=5.0)
+            print(f"[DEBUG] Narrative completed: {narrative[:50]}...")
+        else:
+            print(f"[DEBUG] Narrator not available, using raw result")
+            narrative = raw_result
 
     # Advance to next turn after processing action
     engine.next_turn()
