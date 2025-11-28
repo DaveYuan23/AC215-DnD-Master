@@ -1,0 +1,6 @@
+[core]
+    remote = gcs_remote
+['remote "dnd_remote"']
+    url = gs://dnd-data-versioning/dvc_store
+['remote "gcs_remote"']
+    url = gs://dnd-data-versioning/dvc_store

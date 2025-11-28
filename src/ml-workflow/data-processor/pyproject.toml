@@ -1,0 +1,13 @@
+[project]
+name = "dnd-processor"
+version = "0.1.0"
+description = "Data processor for AC215 DnD project"
+requires-python = ">=3.12"
+
+dependencies = [
+    "google-cloud-storage",
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "pyyaml",
+]

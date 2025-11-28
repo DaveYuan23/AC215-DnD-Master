@@ -1,0 +1,36 @@
+{
+  "run_id": "20251126-051336",
+  "command": "tune",
+  "epochs": 3,
+  "timestamp": "2025-11-26T05:13:36.958333",
+  "config_used": {
+    "experiment": {
+      "run_name": "gemini-sft-v1",
+      "description": "Fine-tune story continuation model on DnD CRD3 dataset.",
+      "processor_version": "processor_v1.0.0"
+    },
+    "project": {
+      "project_id": "even-turbine-471117-u0",
+      "location": "us-central1"
+    },
+    "model": {
+      "base_model": "gemini-2.5-flash",
+      "tuned_display_name": "dnd-gemini-flash-sft-v1"
+    },
+    "data": {
+      "train_uri": "gs://ac215-ml-workflow/dnd-ml-dataset-processor/processor_v1.0.0/train.jsonl",
+      "validation_uri": "gs://ac215-ml-workflow/dnd-ml-dataset-processor/processor_v1.0.0/validation.jsonl"
+    },
+    "training": {
+      "epochs": 3,
+      "batch_size": 8,
+      "learning_rate": 1e-05,
+      "max_steps": 1000
+    }
+  },
+  "lineage": {
+    "processor_version": "processor_v1.0.0",
+    "train_uri": "gs://ac215-ml-workflow/dnd-ml-dataset-processor/processor_v1.0.0/train.jsonl",
+    "validation_uri": "gs://ac215-ml-workflow/dnd-ml-dataset-processor/processor_v1.0.0/validation.jsonl"
+  }
+}

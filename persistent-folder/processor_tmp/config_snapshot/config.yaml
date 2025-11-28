@@ -1,0 +1,18 @@
+dataset:
+  raw_uri: "gs://ac215-ml-workflow/dnd-ml-dataset-raw/crd3_raw.jsonl"
+  output_uri: "gs://ac215-ml-workflow/dnd-ml-dataset-processor/"
+  subset_size: 100
+  train_split: 0.9
+
+schema:
+  input_fields:
+    - "character"
+    - "context"
+    - "response"
+  output_fields:
+    - "input_text"
+    - "output_text"
+
+version:
+  processor_version: "processor_v1.0.0"
+  schema_version: "schema_v1.0.0"
